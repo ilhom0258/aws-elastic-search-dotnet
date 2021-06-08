@@ -1,8 +1,11 @@
-namespace AWSElasticSearchIntegration.Core
+using System.ComponentModel;
+
+namespace AWSElasticSearchIntegration.Core.Models
 {
+    [DisplayName("properties")]
     public class Property
     {
-        public int PropertyID { get; set; }
+        public int PropertyId { get; set; }
         public string Name { get; set; }
         public string FormerName { get; set;}
         public string StreetAddress { get; set; }
