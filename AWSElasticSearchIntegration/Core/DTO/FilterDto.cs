@@ -1,14 +1,12 @@
 ﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace AWSElasticSearchIntegration.Core.DTO
 {
-    public class PropertyFilter
+    public class FilterDto
     {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string City { get; set; }
-        public string State { get; set; }
-        public string Address { get; set; }
+        [Required]
+        public string SearchPhrase { get; set; }
         public IList<string> Markets { get; set; }
         // limit and offset configuration
         public int From { get; set; }

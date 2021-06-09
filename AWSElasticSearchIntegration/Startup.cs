@@ -6,6 +6,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using Nest;
 using System;
+using AWSElasticSearchIntegration.Core.Configs;
+using AWSElasticSearchIntegration.Core.Extensions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AWSElasticSearchIntegration
@@ -46,9 +48,10 @@ namespace AWSElasticSearchIntegration
                 c.SwaggerDoc("v1", new OpenApiInfo {Title = "AWSElasticSearchIntegration", Version = "v1"});
             });
 
-            var connsettings = new ConnectionSettings(new Uri(""))
-            .BasicAuthentication("ilhom0258", "Ikrom2005#");
-            services.AddSingleton<IElasticClient>(new ElasticClient(connsettings));
+            services.AddOptions();
+            services.Configure<AwsConfig>(Configuration.GetSection("AwsConfig").Bind);
+            services.AddElasticClient(Configuration);
+        
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

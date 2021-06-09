@@ -11,13 +11,16 @@ namespace AWSElasticSearchIntegration.Core.Extensions
     /// </summary>
     public static class CommonExtensions
     {
-        public static string GetName(this object obj)
+        public static string GetDisplayName<T>(this T obj)
         {
-            return obj?.GetType()
-                .GetMember(obj.ToString() ?? string.Empty)
-                .FirstOrDefault()
-                ?.GetCustomAttributes<DisplayNameAttribute>()
-                .GetName();
+            var displayName = typeof(T)
+                .GetCustomAttributes(typeof(DisplayNameAttribute), true)
+                .FirstOrDefault() as DisplayNameAttribute;
+
+            if (displayName != null)
+                return displayName.DisplayName;
+
+            return "";
         }
         
         

@@ -14,6 +14,6 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
 
     public interface IBaseElasticSearch
     {
-        Task<Response<PropertySearchDto>> Search(PropertyFilter filter);
+        Task<Response<PropertySearchDto>> Search(FilterDto filterDto);
     }
 }

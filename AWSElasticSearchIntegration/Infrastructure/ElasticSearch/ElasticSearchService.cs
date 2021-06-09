@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using AWSElasticSearchIntegration.Core;
@@ -8,8 +9,6 @@ using AWSElasticSearchIntegration.Core.DTO;
 using AWSElasticSearchIntegration.Core.Enums;
 using AWSElasticSearchIntegration.Core.Extensions;
 using AWSElasticSearchIntegration.Core.Models;
-using Elasticsearch.Net;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Nest;
 
@@ -25,79 +24,79 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
             _client = client;
             _logger = loggerFactory.CreateLogger("ElasticSearchService");
         }
-        
-        public async Task<Response<PropertySearchDto>> Search(PropertyFilter filter)
+
+        public async Task<Response<PropertySearchDto>> Search(FilterDto filterDto)
         {
             var resp = new Response<PropertySearchDto>();
             var payload = new PropertySearchDto();
             var sd = new SearchDescriptor<Property>()
-                .From(filter.From)
-                .Size(filter.Size == 0 ? 25 : filter.Size)
-                .Index(Indexes.Properties.GetDescription());
+                .From(filterDto.From)
+                .Size(filterDto.Size == 0 ? 25 : filterDto.Size)
+                .Index(Indexes.Properties.GetDescription()).TrackTotalHits();
             var qContainers = new List<QueryContainer>();
             var qd = new QueryContainerDescriptor<Property>();
 
-            if (!string.IsNullOrEmpty(filter.City))
+            try
             {
-                var q = qd.Match(m => m
-                    .Field(f => f.City)
-                    .Query(filter.City));
-                qContainers.Add(q);
-            }
-
-            if (!string.IsNullOrEmpty(filter.Name))
-            {
-                var q = qd.Match(m => m
+                var q1 = qd.Fuzzy(m => m
+                    .Fuzziness(Fuzziness.Auto)
+                    .Transpositions(true)
                     .Field(f => f.Name)
                     .Field(f => f.FormerName)
-                    .Query(filter.Name)
-                );
-                qContainers.Add(q);
-            }
-
-            if (!string.IsNullOrEmpty(filter.State))
-            {
-                var q = qd.Match(m => m
+                    .Field(f => f.City)
                     .Field(f => f.State)
-                    .Query(filter.State)
-                );
-                qContainers.Add(q);
-            }
-
-            if (!string.IsNullOrEmpty(filter.Address))
-            {
-                var q = qd.Match(m => m
                     .Field(f => f.StreetAddress)
-                    .Query(filter.Address)
+                    .Value(filterDto.SearchPhrase)
                 );
-                qContainers.Add(q);
-            }
+                qContainers.Add(q1);
+                if (filterDto.Markets != null && filterDto.Markets.Count > 0)
+                {
+                    var q2 = GenerateMultiSearch(filterDto.Markets);
+                    var marketResp = await _client.SearchAsync<Mgmt>(s => s
+                        .Query(q => q
+                            .Bool(b => b
+                                .Must(q2))));
+                    payload.ManagementCount = marketResp.Total;
+                    payload.Managements = marketResp.Documents.Select(t => t);
+                    qContainers.Add(q2);
+                }
 
-            if (filter.Markets != null && filter.Markets.Any())
+                sd.Query(q => q
+                    .Bool(b => b
+                        .Must(qContainers.ToArray())
+                    )
+                );
+                var searchResult = await _client.SearchAsync<Property>(sd);
+                payload.PropertyCount = searchResult.Total;
+                payload.Properties = searchResult.Hits.Select(h => h.Source);
+                resp.Payload = payload;
+                if (payload.PropertyCount <= 0)
+                {
+                    resp.Code = Errors.NotFound;
+                    resp.State = States.Failed.GetDescription();
+                    resp.Message = Errors.NotFound.GetDescription();
+                    return resp;
+                }
+
+                resp.Code = Errors.Success;
+                resp.Message = Errors.Success.GetDescription();
+                resp.State = States.Success.GetDescription();
+            }
+            catch (Exception ex)
             {
-                var q = qd.Terms(t => t
-                    .Field(f => f.Market)
-                    .Terms(filter.Markets.ToArray())
-                );
-                qContainers.Add(q);
+                _logger.LogError($"Error in while searching in {MethodBase.GetCurrentMethod()?.Name} Exception : {ex}");
             }
-
-            sd.Query(q => q
-                .Bool(b => b
-                    .Must(qContainers.ToArray())));
-            var searchResult = await _client.SearchAsync<Property>();
-            payload.PropertyCount = searchResult.Total;
-            payload.Properties = searchResult.Hits.Select(h => h.Source).ToList();
-            resp.Payload = payload;
             return resp;
         }
-
+        
         public async Task<Response<IndexDto>> Index(T model)
         {
             var result = new Response<IndexDto>();
             try
             {
-                var indexResp = await _client.IndexAsync(model, x => x.Index(model.GetName()));
+                var index = model.GetDisplayName();
+                await CreateIndexAsync(index);
+                var indexResp = await _client.IndexAsync(model, x => x.Index(index));
                 if (indexResp.IsValid && !string.IsNullOrEmpty(indexResp.Id))
                 {
                     result.Code = Errors.Success;
@@ -124,17 +123,25 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
             var result = new Response<string>();
             try
             {
+                var index = properties.FirstOrDefault().GetDisplayName();
+                var isIndexExists = await CreateIndexAsync(index);
+                if (!isIndexExists)
+                {
+                    result.Code = Errors.Failed;
+                    result.Message = Errors.Failed.GetDescription();
+                    result.State = States.Failed.GetDescription();
+                    return result;
+                }
                 var waitHandle = new CountdownEvent(1);
                 var bulkResp = _client.BulkAll(properties, b => b
-                    .Index(properties.FirstOrDefault().GetName())
-                    .BackOffRetries(2)
+                    .Index(index)
+                    .BackOffRetries(23)
                     .BackOffTime("30s")
                     .RefreshOnCompleted(true)
                     .MaxDegreeOfParallelism(4));
                 bulkResp.Subscribe(new BulkAllObserver(
                         response =>
                         {
-                            _logger.LogInformation($"Indexed {response.Items} with {response.Retries} retries");
                         },
                         ex =>
                         {
@@ -146,7 +153,7 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
                             result.Code = Errors.Success;
                             result.Message = Errors.Success.GetDescription();
                             result.State = States.Success.GetDescription();
-                            _logger.LogInformation("Bulk insert of ");
+                            _logger.LogInformation($"Bulk insert for {index} completed");
                             waitHandle.Signal();
                         }
                 ));
@@ -154,10 +161,79 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
             }
             catch (Exception ex)
             {
+                result.Code = Errors.InternalError;
+                result.Message = Errors.InternalError.GetDescription();
+                result.State = States.Failed.GetDescription();
                 _logger.LogError("Elastic Search service: Bulk index (internal error) \n Exception : {@ex} ", ex);
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// method for creating custom index over the provided models
+        /// </summary>
+        /// <param name="index">doc name in order to create</param>
+        /// <returns>nothing to return</returns>
+        private async Task<bool> CreateIndexAsync(string index)
+        {
+            try
+            {
+                var indexExistsResponse = await _client.Indices.ExistsAsync(index);
+                if (!indexExistsResponse.Exists)
+                {
+                    var createIndexResponse = await _client.Indices.CreateAsync(index,
+                        c => c
+                            .Settings(s => s
+                                .Analysis(a => a
+                                    .Analyzers(ad => ad
+                                        .Standard("standard_english", sa => sa
+                                            .StopWords("_english_") 
+                                        )
+                                        .Custom("partial_text", ca => ca
+                                            .Filters("lowercase", "edge_ngrams")
+                                            .Tokenizer("standard"))
+                                        // give the custom analyzer a name
+                                        .Custom("full_text", ca => ca
+                                            .Tokenizer("standard")
+                                            .Filters("lowercase", "stop", "standard", "snowball")
+                                        )
+                                    )
+                                )
+                            )
+                            .Map<T>(d => d
+                                .AutoMap()
+                            )
+                    );
+                    if (createIndexResponse.IsValid && createIndexResponse.OriginalException == null)
+                    {
+                        return true;
+                    }
+
+                    _logger.LogError("Error while creating index \nResponse = {@resp}", createIndexResponse);
+                    return false;
+                }
+
+                return true; 
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error while creating index \nException : {@ex}", ex);
+                return false;
+            }
+        }
+        private static QueryContainer GenerateMultiSearch(IList<string> markets)
+        {
+            return new QueryContainerDescriptor<Property>().Bool(
+                b => b.Should(
+                    GenerateDescription(markets)
+                )
+            );
+        }
+        private static QueryContainer[] GenerateDescription(IEnumerable<string> markets)
+        {
+            return markets.Select(item => new MatchPhraseQuery {Field = "market", Query = item})
+                .Select(orQuery => (QueryContainer) orQuery).ToArray();
         }
     }
 }

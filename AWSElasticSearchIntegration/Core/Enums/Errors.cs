@@ -18,6 +18,8 @@ namespace AWSElasticSearchIntegration.Core.Enums
         [Description("Timeout of service")]
         Timeout = 1005,
         [Description("Upstream service unavailable")]
-        ServiceUnavailable = 1006
+        ServiceUnavailable = 1006,
+        [Description("Not Found")]
+        NotFound = 1007
     }
 }
