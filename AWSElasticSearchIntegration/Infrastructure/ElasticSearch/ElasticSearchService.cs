@@ -32,7 +32,8 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
             var sd = new SearchDescriptor<Property>()
                 .From(filterDto.From)
                 .Size(filterDto.Size == 0 ? 25 : filterDto.Size)
-                .Index(Indexes.Properties.GetDescription()).TrackTotalHits();
+                .Index(Indexes.Properties.GetDescription())
+                .TrackTotalHits();
             var qContainers = new List<QueryContainer>();
             var qd = new QueryContainerDescriptor<Property>();
 
@@ -187,22 +188,14 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
                             .Settings(s => s
                                 .Analysis(a => a
                                     .Analyzers(ad => ad
-                                        .Standard("standard_english", sa => sa
-                                            .StopWords("_english_") 
-                                        )
-                                        .Custom("partial_text", ca => ca
-                                            .Filters("lowercase", "edge_ngrams")
-                                            .Tokenizer("standard"))
-                                        // give the custom analyzer a name
-                                        .Custom("full_text", ca => ca
+                                        .Custom("full_text", cs => cs
                                             .Tokenizer("standard")
-                                            .Filters("lowercase", "stop", "standard", "snowball")
-                                        )
+                                            .Filters("stop", "snowball", "lowercase", "asciifolding"))
                                     )
                                 )
                             )
                             .Map<T>(d => d
-                                .AutoMap()
+                                .AutoMap<T>()
                             )
                     );
                     if (createIndexResponse.IsValid && createIndexResponse.OriginalException == null)

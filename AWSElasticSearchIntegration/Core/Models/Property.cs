@@ -8,17 +8,24 @@ namespace AWSElasticSearchIntegration.Core.Models
     public class Property
     {
         public int PropertyId { get; set; }
-        [Text(Analyzer = "partial_text")] public string Name { get; set; }
+        // [Text(Analyzer = "full_text", SearchAnalyzer = "full_text")] 
+        public string Name { get; set; }
 
-        [Text(Analyzer = "partial_text")] public string FormerName { get; set; }
+        // [Text(Analyzer = "full_text", SearchAnalyzer = "full_text")] 
+        public string FormerName { get; set; }
 
-        [Text(Analyzer = "partial_text")] public string StreetAddress { get; set; }
+        // [Text(Analyzer = "full_text", SearchAnalyzer = "full_text")] 
+        public string StreetAddress { get; set; }
 
-        [Text(Analyzer = "partial_text")] public string City { get; set; }
+        // [Text(Analyzer = "full_text", SearchAnalyzer = "full_text")] 
+        public string City { get; set; }
+        
+        // [Text(Analyzer = "full_text", SearchAnalyzer = "full_text")] 
+        
+        public string Market { get; set; }
 
-        [Keyword] public string Market { get; set; }
-
-        [Text(Analyzer = "partial_text")] public string State { get; set; }
+        // [Text(Analyzer = "full_text", SearchAnalyzer = "full_text")] 
+        public string State { get; set; }
         public float Lat { get; set; }
         public float Lng { get; set; }
     }
