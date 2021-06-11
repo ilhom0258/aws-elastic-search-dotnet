@@ -10,6 +10,7 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
     {
         Task<Response<IndexDto>> Index(T model);
         Task<Response<string>> IndexBulk(IList<T> properties);
+        Task<Response<string>> DeleteIndexAsync();
     }
 
     public interface IBaseElasticSearch

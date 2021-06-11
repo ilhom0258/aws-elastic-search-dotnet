@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -18,6 +19,10 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
     {
         private readonly IElasticClient _client;
         private readonly ILogger _logger;
+        
+        private string _index = (typeof(T)
+        .GetCustomAttributes(typeof(DisplayNameAttribute), true)
+        .FirstOrDefault() as DisplayNameAttribute)?.DisplayName;
 
         public ElasticSearchService(IElasticClient client, ILoggerFactory loggerFactory)
         {
@@ -126,8 +131,7 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
             var result = new Response<IndexDto>();
             try
             {
-                var index = model.GetDisplayName();
-                var indexCreateResp = await CreateIndexAsync(index);
+                var indexCreateResp = await CreateIndexAsync(_index);
                 if (!indexCreateResp)
                 {
                     result.Code = Errors.Failed;
@@ -135,7 +139,7 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
                     result.State = States.Failed.GetDescription();
                     return result;
                 }
-                var indexResp = await _client.IndexAsync(model, x => x.Index(index));
+                var indexResp = await _client.IndexAsync(model, x => x.Index(_index));
                 if (indexResp.IsValid && !string.IsNullOrEmpty(indexResp.Id))
                 {
                     result.Code = Errors.Success;
@@ -162,8 +166,7 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
             var result = new Response<string>();
             try
             {
-                var index = properties.FirstOrDefault().GetDisplayName();
-                var indexResp = await CreateIndexAsync(index);
+                var indexResp = await CreateIndexAsync(_index);
                 if (!indexResp)
                 {
                     result.Code = Errors.Failed;
@@ -173,7 +176,7 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
                 }
                 var waitHandle = new CountdownEvent(1);
                 var bulkResp = _client.BulkAll(properties, b => b
-                    .Index(index)
+                    .Index(_index)
                     .BackOffRetries(23)
                     .BackOffTime("30s")
                     .RefreshOnCompleted(true)
@@ -192,7 +195,7 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
                             result.Code = Errors.Success;
                             result.Message = Errors.Success.GetDescription();
                             result.State = States.Success.GetDescription();
-                            _logger.LogInformation($"Bulk insert for {index} completed");
+                            _logger.LogInformation($"Bulk insert for {_index} completed");
                             waitHandle.Signal();
                         }
                 ));
@@ -208,6 +211,42 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
 
             return result;
         }
+
+        /// <summary>
+        /// Deleting index
+        /// </summary>
+        /// <returns>Generic response indicating the state of request</returns>
+        public async Task<Response<string>> DeleteIndexAsync()
+        {
+            var result = new Response<string>()
+            {
+                Code = Errors.InternalError,
+                Message = Errors.InternalError.GetDescription(),
+                State = States.Failed.GetDescription()
+            };
+            try
+            {
+                var deleteIndexResp = await _client.Indices.DeleteAsync(_index);
+                if (deleteIndexResp.IsValid)
+                {
+                    result.Code = Errors.Success;
+                    result.Message = Errors.Success.GetDescription();
+                    result.State = States.Success.GetDescription();
+                    return result;
+                }
+
+                result.Code = Errors.Failed;
+                result.Message = Errors.Failed.GetDescription();
+                result.State = States.Failed.GetDescription();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error while deleting index : {@ex}", ex);
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// method for creating custom index over the provided models
         /// </summary>
