@@ -8,11 +8,8 @@ namespace AWSElasticSearchIntegration.Core.Models
     public class Mgmt
     {
         public int MgmtId { get; set;}
-        // [Text(Analyzer = "full_text")]
         public string Name { get; set; }
-        // [Text(Analyzer = "full_text")]
         public string Market { get; set; }
-        // [Text(Analyzer = "full_text")]
         public string State { get; set; }     
     }
 }
