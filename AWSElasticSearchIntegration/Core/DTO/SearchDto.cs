@@ -3,7 +3,7 @@ using AWSElasticSearchIntegration.Core.Models;
 
 namespace AWSElasticSearchIntegration.Core.DTO
 {
-    public class PropertySearchDto
+    public class SearchDto
     {
         public long PropertyCount { get; set; }
         public long ManagementCount { get; set; }

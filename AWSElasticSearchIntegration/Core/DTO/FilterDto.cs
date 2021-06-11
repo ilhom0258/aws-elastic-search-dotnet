@@ -9,8 +9,6 @@ namespace AWSElasticSearchIntegration.Core.DTO
         public string SearchPhrase { get; set; }
 
         public string City { get; set; }
-
-        public string StreetAddress { get; set; }
         public string State { get; set; }
 
         public IList<string> Markets { get; set; }

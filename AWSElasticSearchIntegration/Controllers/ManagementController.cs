@@ -33,5 +33,11 @@ namespace AWSElasticSearchIntegration.Controllers
         {
             return await _elasticService.IndexBulk(properties);
         }
+        
+        [HttpPost("Find")]
+        public async Task<Response<SearchDto>> Find([FromBody] FilterDto filterDto)
+        {
+            return await _elasticService.Search(filterDto);
+        }
     }
 }

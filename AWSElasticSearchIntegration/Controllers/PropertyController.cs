@@ -33,7 +33,7 @@ namespace AWSElasticSearchIntegration.Controllers
         }
 
         [HttpPost("Find")]
-        public async Task<Response<PropertySearchDto>> Find([FromBody] FilterDto filterDto)
+        public async Task<Response<SearchDto>> Find([FromBody] FilterDto filterDto)
         {
             return await _elasticService.Search(filterDto);
         }
