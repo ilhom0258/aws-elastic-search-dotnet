@@ -30,6 +30,11 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
             _logger = loggerFactory.CreateLogger("ElasticSearchService");
         }
 
+        /// <summary>
+        /// Searches for properties based on filter
+        /// </summary>
+        /// <param name="filterDto"></param>
+        /// <returns>Search Dto that has data for what we searched</returns>
         public async Task<Response<SearchDto>> Search(FilterDto filterDto) 
         {
             var resp = new Response<SearchDto>();
@@ -126,6 +131,11 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
             return resp;
         }
         
+        /// <summary>
+        /// Adds a model into the specific document
+        /// </summary>
+        /// <param name="model">generic model</param>
+        /// <returns></returns>
         public async Task<Response<IndexDto>> Index(T model)
         {
             var result = new Response<IndexDto>();
@@ -144,6 +154,7 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
                 {
                     result.Code = Errors.Success;
                     result.Message = Errors.Success.GetDescription();
+                    result.State = States.Success.GetDescription();
                     result.Payload = new IndexDto() {Id = indexResp.Id};
                     return result;
                 }
@@ -161,6 +172,11 @@ namespace AWSElasticSearchIntegration.Infrastructure.ElasticSearch
             return result;
         }
 
+        /// <summary>
+        /// Performs generic bulk addition for the list of objects
+        /// </summary>
+        /// <param name="properties"></param>
+        /// <returns></returns>
         public async Task<Response<string>> IndexBulk(IList<T> properties)
         {
             var result = new Response<string>();

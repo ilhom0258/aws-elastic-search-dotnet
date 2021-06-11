@@ -39,5 +39,11 @@ namespace AWSElasticSearchIntegration.Controllers
         {
             return await _elasticService.Search(filterDto);
         }
+        
+        [HttpDelete("DeleteAll")]
+        public async Task<Response<string>> DeleteAllAsync()
+        {
+            return await _elasticService.DeleteIndexAsync();
+        } 
     }
 }
